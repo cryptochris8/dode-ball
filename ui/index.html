@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dodgeball Game</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            color: white;
+            overflow: hidden;
+        }
+
+        /* Crosshair */
+        .crosshair {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .crosshair::before,
+        .crosshair::after {
+            content: '';
+            position: absolute;
+            background-color: rgba(255, 255, 255, 0.8);
+        }
+
+        .crosshair::before {
+            width: 2px;
+            height: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .crosshair::after {
+            width: 100%;
+            height: 2px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        /* Game HUD */
+        .hud {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 1000;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 8px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .team-info {
+            margin-bottom: 10px;
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        .team-red {
+            color: #ff4444;
+        }
+
+        .team-blue {
+            color: #4444ff;
+        }
+
+        .game-state {
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .team-scores {
+            display: flex;
+            gap: 20px;
+            font-size: 14px;
+        }
+
+        .score-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        /* Game announcements */
+        .announcement {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 48px;
+            font-weight: bold;
+            text-align: center;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+            opacity: 0;
+            z-index: 2000;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .announcement.show {
+            opacity: 1;
+        }
+
+        /* Eliminated overlay */
+        .eliminated-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 0, 0, 0.3);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1500;
+            pointer-events: none;
+        }
+
+        .eliminated-overlay.show {
+            display: flex;
+        }
+
+        .eliminated-text {
+            font-size: 36px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+        }
+
+        /* Instructions */
+        .instructions {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+    <!-- Crosshair -->
+    <div class="crosshair"></div>
+
+    <!-- Game HUD -->
+    <div class="hud">
+        <div class="team-info" id="team-info">
+            Team: <span id="team-name">Unknown</span>
+        </div>
+        <div class="game-state" id="game-state">
+            Waiting for players...
+        </div>
+        <div class="team-scores">
+            <div class="score-item">
+                <span class="team-red">Red:</span>
+                <span id="red-alive">0</span>
+            </div>
+            <div class="score-item">
+                <span class="team-blue">Blue:</span>
+                <span id="blue-alive">0</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Announcements -->
+    <div class="announcement" id="announcement"></div>
+
+    <!-- Eliminated overlay -->
+    <div class="eliminated-overlay" id="eliminated-overlay">
+        <div class="eliminated-text">YOU ARE ELIMINATED!</div>
+    </div>
+
+    <!-- Instructions -->
+    <div class="instructions">
+        <strong>Controls:</strong><br>
+        WASD - Move<br>
+        Space - Jump<br>
+        Shift - Run<br>
+        Left Click - Throw Dodgeball<br>
+        Right Click - Catch Dodgeball
+    </div>
+
+    <script>
+        let gameState = {
+            team: null,
+            isAlive: true,
+            gameState: 'waiting',
+            redAlive: 0,
+            blueAlive: 0
+        };
+
+        // Handle data from game server
+        hytopia.onData(data => {
+            if (data.type === 'game-update') {
+                updateGameState(data);
+            } else if (data.type === 'announcement') {
+                showAnnouncement(data.message, data.color);
+            }
+        });
+
+        function updateGameState(data) {
+            gameState = { ...gameState, ...data };
+            
+            // Update team display
+            const teamName = document.getElementById('team-name');
+            const teamInfo = document.getElementById('team-info');
+            if (gameState.team) {
+                teamName.textContent = gameState.team.toUpperCase();
+                teamInfo.className = `team-info team-${gameState.team}`;
+            }
+
+            // Update game state
+            const gameStateEl = document.getElementById('game-state');
+            switch (gameState.gameState) {
+                case 'waiting':
+                    gameStateEl.textContent = 'Waiting for players...';
+                    break;
+                case 'starting':
+                    gameStateEl.textContent = 'Game starting...';
+                    break;
+                case 'playing':
+                    gameStateEl.textContent = 'ROUND IN PROGRESS';
+                    break;
+                case 'ending':
+                    gameStateEl.textContent = 'Round ending...';
+                    break;
+            }
+
+            // Update team counts
+            document.getElementById('red-alive').textContent = gameState.redAlive;
+            document.getElementById('blue-alive').textContent = gameState.blueAlive;
+
+            // Show/hide eliminated overlay
+            const eliminatedOverlay = document.getElementById('eliminated-overlay');
+            if (!gameState.isAlive) {
+                eliminatedOverlay.classList.add('show');
+            } else {
+                eliminatedOverlay.classList.remove('show');
+            }
+        }
+
+        function showAnnouncement(message, color = '#ffffff') {
+            const announcement = document.getElementById('announcement');
+            announcement.textContent = message;
+            announcement.style.color = color;
+            announcement.classList.add('show');
+
+            setTimeout(() => {
+                announcement.classList.remove('show');
+            }, 3000);
+        }
+
+        // Debug info
+        console.log('Dodgeball UI loaded');
+    </script>
+</body>
+</html>

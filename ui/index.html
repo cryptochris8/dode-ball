@@ -3,33 +3,219 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dodgeball Game</title>
+    <title>🎯 Ultimate Dodgeball Arena</title>
     <style>
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: Arial, sans-serif;
-            color: white;
-            overflow: hidden;
+        :root {
+            --primary-red: #FF4444;
+            --primary-blue: #4444FF;
+            --accent-gold: #FFD700;
+            --accent-purple: #9932CC;
+            --neutral-dark: #1a1a1a;
+            --neutral-light: #ffffff;
+            --success-green: #00FF00;
+            --warning-orange: #FFA500;
         }
 
-        /* Crosshair */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--neutral-light);
+            overflow: hidden;
+            background: linear-gradient(135deg, var(--neutral-dark) 0%, #2a2a2a 100%);
+            touch-action: none; /* Prevent default touch behaviors */
+        }
+
+        /* Mobile Detection & Touch Controls */
+        .mobile-controls {
+            display: none;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 20px;
+            pointer-events: none;
+            z-index: 1500;
+        }
+
+        .mobile-controls.show {
+            display: block;
+        }
+
+        .touch-joystick {
+            position: absolute;
+            bottom: 100px;
+            left: 20px;
+            width: 120px;
+            height: 120px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            border: 2px solid var(--accent-gold);
+            pointer-events: auto;
+            touch-action: none;
+        }
+
+        .joystick-handle {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 40px;
+            height: 40px;
+            background: var(--accent-gold);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            transition: all 0.1s ease;
+        }
+
+        .action-buttons {
+            position: absolute;
+            bottom: 100px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            pointer-events: auto;
+        }
+
+        .action-btn {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            border: none;
+            background: var(--primary-red);
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .action-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+        }
+
+        .action-btn:active {
+            transform: scale(0.95);
+        }
+
+        .action-btn.throw {
+            background: var(--primary-blue);
+        }
+
+        .action-btn.dash {
+            background: var(--accent-purple);
+        }
+
+        .action-btn.catch {
+            background: var(--success-green);
+        }
+
+        /* Mobile HUD Adjustments */
+        @media (max-width: 768px) {
+            .hud-top {
+                padding: 10px;
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .game-title {
+                font-size: 18px;
+            }
+
+            .timer-display {
+                font-size: 20px;
+            }
+
+            .team-scores {
+                width: 100%;
+                justify-content: space-around;
+            }
+
+            .mini-map {
+                display: none; /* Hide mini-map on mobile for space */
+            }
+
+            .player-hud {
+                bottom: 200px; /* Move up to avoid touch controls */
+                padding: 10px;
+            }
+
+            .power-up-slots {
+                bottom: 160px;
+                gap: 5px;
+            }
+
+            .power-up-slot {
+                width: 40px;
+                height: 40px;
+                font-size: 16px;
+            }
+
+            /* Hide crosshair on mobile */
+            .crosshair {
+                display: none;
+            }
+        }
+
+        /* Touch feedback */
+        .touch-feedback {
+            position: fixed;
+            pointer-events: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: rgba(255, 215, 0, 0.6);
+            transform: translate(-50%, -50%);
+            animation: touchPulse 0.3s ease-out;
+            z-index: 1600;
+        }
+
+        @keyframes touchPulse {
+            0% {
+                transform: translate(-50%, -50%) scale(0);
+                opacity: 1;
+            }
+            100% {
+                transform: translate(-50%, -50%) scale(2);
+                opacity: 0;
+            }
+        }
+
+        /* Enhanced Crosshair */
         .crosshair {
             position: fixed;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 20px;
-            height: 20px;
+            width: 24px;
+            height: 24px;
             pointer-events: none;
             z-index: 100;
+            opacity: 0.8;
+            transition: opacity 0.2s ease;
+        }
+
+        .crosshair.active {
+            opacity: 1;
         }
 
         .crosshair::before,
         .crosshair::after {
             content: '';
             position: absolute;
-            background-color: rgba(255, 255, 255, 0.8);
+            background: linear-gradient(90deg, var(--accent-gold), var(--primary-red));
+            border-radius: 1px;
+            box-shadow: 0 0 4px rgba(255, 215, 0, 0.5);
         }
 
         .crosshair::before {
@@ -46,47 +232,246 @@
             transform: translateY(-50%);
         }
 
-        /* Game HUD */
-        .hud {
+        /* Modern HUD Design */
+        .hud-container {
             position: fixed;
-            top: 20px;
-            left: 20px;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
             z-index: 1000;
-            background: rgba(0, 0, 0, 0.7);
-            padding: 15px;
-            border-radius: 8px;
-            border: 2px solid rgba(255, 255, 255, 0.3);
         }
 
-        .team-info {
-            margin-bottom: 10px;
+        .hud-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 20px;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, transparent 100%);
+        }
+
+        .game-header {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .game-title {
+            font-size: 24px;
             font-weight: bold;
+            background: linear-gradient(45deg, var(--accent-gold), var(--primary-red));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+        }
+
+        .game-mode {
+            font-size: 14px;
+            color: var(--accent-purple);
+            font-weight: 500;
+        }
+
+        .timer-display {
+            background: rgba(0, 0, 0, 0.8);
+            padding: 8px 16px;
+            border-radius: 20px;
+            border: 2px solid var(--accent-gold);
             font-size: 18px;
-        }
-
-        .team-red {
-            color: #ff4444;
-        }
-
-        .team-blue {
-            color: #4444ff;
-        }
-
-        .game-state {
-            margin-bottom: 10px;
-            font-size: 16px;
+            font-weight: bold;
+            color: var(--accent-gold);
+            text-align: center;
+            min-width: 120px;
         }
 
         .team-scores {
             display: flex;
-            gap: 20px;
-            font-size: 14px;
+            gap: 30px;
         }
 
-        .score-item {
+        .team-score {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 12px 20px;
+            border-radius: 12px;
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .team-score.team-red {
+            border-color: var(--primary-red);
+            box-shadow: 0 0 15px rgba(255, 68, 68, 0.3);
+        }
+
+        .team-score.team-blue {
+            border-color: var(--primary-blue);
+            box-shadow: 0 0 15px rgba(68, 68, 255, 0.3);
+        }
+
+        .team-name {
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .team-score-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: var(--neutral-light);
+        }
+
+        .team-players {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        /* Player Status HUD */
+        .player-hud {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 16px;
+            border-radius: 12px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            min-width: 280px;
+        }
+
+        .player-info {
             display: flex;
             align-items: center;
-            gap: 5px;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .player-avatar {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(45deg, var(--primary-red), var(--primary-blue));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+        }
+
+        .player-details h3 {
+            font-size: 16px;
+            margin-bottom: 2px;
+        }
+
+        .player-team {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        .player-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            font-size: 12px;
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* Power-up Indicators */
+        .power-ups {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .power-up-slot {
+            width: 60px;
+            height: 60px;
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 12px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .power-up-slot.active {
+            border-color: var(--accent-gold);
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+            animation: pulse 2s infinite;
+        }
+
+        .power-up-cooldown {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: var(--primary-red);
+            transform-origin: left;
+            transition: transform 0.3s ease;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        /* Mini-map */
+        .mini-map {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 150px;
+            height: 150px;
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 12px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            overflow: hidden;
+        }
+
+        .map-background {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(45deg, #4a4a4a, #2a2a2a);
+            position: relative;
+        }
+
+        .map-player {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            border: 2px solid white;
+            transform: translate(-50%, -50%);
+        }
+
+        .map-player.team-red {
+            background: var(--primary-red);
+        }
+
+        .map-player.team-blue {
+            background: var(--primary-blue);
+        }
+
+        .map-player.current {
+            border-color: var(--accent-gold);
+            box-shadow: 0 0 8px rgba(255, 215, 0, 0.8);
         }
 
         /* Game announcements */
@@ -149,103 +534,587 @@
     </style>
 </head>
 <body>
-    <!-- Crosshair -->
-    <div class="crosshair"></div>
-
-    <!-- Game HUD -->
-    <div class="hud">
-        <div class="team-info" id="team-info">
-            Team: <span id="team-name">Unknown</span>
-        </div>
-        <div class="game-state" id="game-state">
-            Waiting for players...
-        </div>
-        <div class="team-scores">
-            <div class="score-item">
-                <span class="team-red">Red:</span>
-                <span id="red-alive">0</span>
+    <!-- HUD Container -->
+    <div class="hud-container">
+        <!-- Top HUD -->
+        <div class="hud-top">
+            <div class="game-header">
+                <div class="game-title">🎯 Ultimate Dodgeball Arena</div>
+                <div class="game-mode" id="game-mode">Classic Mode</div>
             </div>
-            <div class="score-item">
-                <span class="team-blue">Blue:</span>
-                <span id="blue-alive">0</span>
+
+            <div class="timer-display" id="game-timer">00:00</div>
+
+            <div class="team-scores">
+                <div class="team-score team-red">
+                    <div class="team-name">🔴 RED</div>
+                    <div class="team-score-value" id="red-score">0</div>
+                    <div class="team-players" id="red-players">0/0</div>
+                </div>
+                <div class="team-score team-blue">
+                    <div class="team-name">🔵 BLUE</div>
+                    <div class="team-score-value" id="blue-score">0</div>
+                    <div class="team-players" id="blue-players">0/0</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mini-map -->
+        <div class="mini-map">
+            <div class="map-background" id="mini-map">
+                <!-- Player dots will be added dynamically -->
             </div>
         </div>
     </div>
 
-    <!-- Announcements -->
+    <!-- Crosshair -->
+    <div class="crosshair" id="crosshair"></div>
+
+    <!-- Mobile Touch Controls -->
+    <div class="mobile-controls" id="mobile-controls">
+        <div class="touch-joystick" id="touch-joystick">
+            <div class="joystick-handle" id="joystick-handle"></div>
+        </div>
+        <div class="action-buttons">
+            <button class="action-btn throw" id="throw-btn" title="Throw Dodgeball">🎯</button>
+            <button class="action-btn catch" id="catch-btn" title="Catch Dodgeball">👐</button>
+            <button class="action-btn dash" id="dash-btn" title="Dash">⚡</button>
+        </div>
+    </div>
+
+    <!-- Player HUD -->
+    <div class="player-hud">
+        <div class="player-info">
+            <div class="player-avatar" id="player-avatar">P</div>
+            <div class="player-details">
+                <h3 id="player-name">Player</h3>
+                <div class="player-team" id="player-team">Team: Unknown</div>
+            </div>
+        </div>
+
+        <div class="player-stats">
+            <div class="stat-item">
+                <span>🏐 Balls Thrown</span>
+                <span id="balls-thrown">0</span>
+            </div>
+            <div class="stat-item">
+                <span>🎣 Catches</span>
+                <span id="catches">0</span>
+            </div>
+            <div class="stat-item">
+                <span>💀 Deaths</span>
+                <span id="deaths">0</span>
+            </div>
+            <div class="stat-item">
+                <span>⚡ Power-ups</span>
+                <span id="power-ups">0</span>
+            </div>
+            <div class="stat-item">
+                <span>🏆 K/D Ratio</span>
+                <span id="kd-ratio">0.00</span>
+            </div>
+            <div class="stat-item">
+                <span>⭐ Best Streak</span>
+                <span id="best-streak">0</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Power-up Slots -->
+    <div class="power-ups" id="power-up-slots">
+        <div class="power-up-slot" data-slot="1">
+            <div class="power-up-cooldown" style="transform: scaleX(0);"></div>
+        </div>
+        <div class="power-up-slot" data-slot="2">
+            <div class="power-up-cooldown" style="transform: scaleX(0);"></div>
+        </div>
+        <div class="power-up-slot" data-slot="3">
+            <div class="power-up-cooldown" style="transform: scaleX(0);"></div>
+        </div>
+    </div>
+
+    <!-- Enhanced Announcements -->
     <div class="announcement" id="announcement"></div>
 
-    <!-- Eliminated overlay -->
+    <!-- Eliminated Overlay -->
     <div class="eliminated-overlay" id="eliminated-overlay">
-        <div class="eliminated-text">YOU ARE ELIMINATED!</div>
+        <div class="eliminated-text" id="eliminated-message">YOU ARE ELIMINATED!</div>
     </div>
 
-    <!-- Instructions -->
-    <div class="instructions">
-        <strong>Controls:</strong><br>
-        WASD - Move<br>
-        Space - Jump<br>
-        Shift - Run<br>
-        Left Click - Throw Dodgeball<br>
-        Right Click - Catch Dodgeball
+    <!-- Achievement Notifications -->
+    <div class="achievement-notification" id="achievement-notification" style="display: none;">
+        <div class="achievement-content">
+            <div class="achievement-icon" id="achievement-icon">🏆</div>
+            <div class="achievement-text">
+                <div class="achievement-title" id="achievement-title">Achievement Unlocked!</div>
+                <div class="achievement-description" id="achievement-description">Description</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Mode Selector (shown before game starts) -->
+    <div class="game-mode-selector" id="game-mode-selector" style="display: none;">
+        <div class="mode-selector-content">
+            <h2>🎮 Choose Game Mode</h2>
+            <div class="mode-options">
+                <div class="mode-option" data-mode="classic">
+                    <div class="mode-icon">🏐</div>
+                    <div class="mode-info">
+                        <h3>Classic Dodgeball</h3>
+                        <p>Traditional team-based elimination</p>
+                    </div>
+                </div>
+                <div class="mode-option" data-mode="survival">
+                    <div class="mode-icon">⚔️</div>
+                    <div class="mode-info">
+                        <h3>Survival Mode</h3>
+                        <p>Last team standing wins!</p>
+                    </div>
+                </div>
+                <div class="mode-option" data-mode="time_attack">
+                    <div class="mode-icon">⏱️</div>
+                    <div class="mode-info">
+                        <h3>Time Attack</h3>
+                        <p>Score eliminations in limited time</p>
+                    </div>
+                </div>
+                <div class="mode-option" data-mode="power_up_madness">
+                    <div class="mode-icon">🎉</div>
+                    <div class="mode-info">
+                        <h3>Power-up Madness</h3>
+                        <p>Frequent power-ups and chaos!</p>
+                    </div>
+                </div>
+                <div class="mode-option" data-mode="chaos">
+                    <div class="mode-icon">🎲</div>
+                    <div class="mode-info">
+                        <h3>Chaos Mode</h3>
+                        <p>Random events and unpredictability</p>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
+        // Enhanced game state management
         let gameState = {
             team: null,
             isAlive: true,
             gameState: 'waiting',
+            gameMode: 'classic',
             redAlive: 0,
-            blueAlive: 0
+            blueAlive: 0,
+            redTotal: 0,
+            blueTotal: 0,
+            redScore: 0,
+            blueScore: 0,
+            timeRemaining: 0,
+            powerUps: [],
+            playerStats: {
+                ballsThrown: 0,
+                catches: 0,
+                deaths: 0,
+                powerUpsCollected: 0,
+                kdRatio: 0.00,
+                bestStreak: 0
+            },
+            players: [],
+            currentPlayer: null
         };
+
+        let gameTimer = null;
+        let achievementQueue = [];
+
+        // Mobile Detection & Touch Controls
+        let isMobile = false;
+        let touchControls = {
+            joystick: {
+                active: false,
+                centerX: 0,
+                centerY: 0,
+                handle: null,
+                maxDistance: 40,
+                input: { x: 0, y: 0 }
+            },
+            buttons: {
+                throw: false,
+                catch: false,
+                dash: false
+            }
+        };
+
+        // Initialize UI
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeUI();
+            console.log('🎮 Ultimate Dodgeball Arena UI loaded');
+        });
+
+        // Mobile Detection
+        function detectMobile() {
+            const userAgent = navigator.userAgent.toLowerCase();
+            const mobileKeywords = ['mobile', 'android', 'iphone', 'ipad', 'ipod', 'blackberry', 'windows phone'];
+
+            // Check user agent
+            const isMobileAgent = mobileKeywords.some(keyword => userAgent.includes(keyword));
+
+            // Check screen size and touch capability
+            const isSmallScreen = window.innerWidth <= 768 || window.innerHeight <= 600;
+            const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+            // Check for mobile viewport meta tag effectiveness
+            const viewport = document.querySelector('meta[name="viewport"]');
+            const isMobileViewport = viewport && viewport.content.includes('width=device-width');
+
+            isMobile = (isMobileAgent || (isSmallScreen && hasTouch)) && isMobileViewport;
+
+            console.log('📱 Mobile detection:', {
+                userAgent: isMobileAgent,
+                screenSize: isSmallScreen,
+                hasTouch,
+                viewport: isMobileViewport,
+                result: isMobile
+            });
+
+            return isMobile;
+        }
+
+        // Initialize Touch Controls
+        function initializeTouchControls() {
+            const mobileControls = document.getElementById('mobile-controls');
+            const joystick = document.getElementById('touch-joystick');
+            const joystickHandle = document.getElementById('joystick-handle');
+            const throwBtn = document.getElementById('throw-btn');
+            const catchBtn = document.getElementById('catch-btn');
+            const dashBtn = document.getElementById('dash-btn');
+
+            if (!mobileControls || !joystick || !joystickHandle || !throwBtn || !catchBtn || !dashBtn) {
+                console.error('❌ Mobile control elements not found');
+                return;
+            }
+
+            // Store joystick handle reference
+            touchControls.joystick.handle = joystickHandle;
+
+            // Joystick touch events
+            joystick.addEventListener('touchstart', handleJoystickStart);
+            joystick.addEventListener('touchmove', handleJoystickMove);
+            joystick.addEventListener('touchend', handleJoystickEnd);
+
+            // Action button events
+            throwBtn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                touchControls.buttons.throw = true;
+                createTouchFeedback(e.touches[0].clientX, e.touches[0].clientY);
+            });
+
+            throwBtn.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                touchControls.buttons.throw = false;
+            });
+
+            catchBtn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                touchControls.buttons.catch = true;
+                createTouchFeedback(e.touches[0].clientX, e.touches[0].clientY);
+            });
+
+            catchBtn.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                touchControls.buttons.catch = false;
+            });
+
+            dashBtn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                touchControls.buttons.dash = true;
+                createTouchFeedback(e.touches[0].clientX, e.touches[0].clientY);
+            });
+
+            dashBtn.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                touchControls.buttons.dash = false;
+            });
+
+            console.log('🎮 Touch controls initialized');
+        }
+
+        // Joystick event handlers
+        function handleJoystickStart(e) {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const joystickRect = e.target.getBoundingClientRect();
+
+            touchControls.joystick.active = true;
+            touchControls.joystick.centerX = joystickRect.left + joystickRect.width / 2;
+            touchControls.joystick.centerY = joystickRect.top + joystickRect.height / 2;
+
+            handleJoystickMove(e);
+        }
+
+        function handleJoystickMove(e) {
+            if (!touchControls.joystick.active) return;
+
+            e.preventDefault();
+            const touch = e.touches[0];
+            const handle = touchControls.joystick.handle;
+
+            if (!handle) return;
+
+            const deltaX = touch.clientX - touchControls.joystick.centerX;
+            const deltaY = touch.clientY - touchControls.joystick.centerY;
+            const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+            const maxDistance = touchControls.joystick.maxDistance;
+
+            // Clamp to max distance
+            const clampedDistance = Math.min(distance, maxDistance);
+            const angle = Math.atan2(deltaY, deltaX);
+
+            // Calculate clamped position
+            const clampedX = Math.cos(angle) * clampedDistance;
+            const clampedY = Math.sin(angle) * clampedDistance;
+
+            // Update handle position
+            handle.style.transform = `translate(${clampedX}px, ${clampedY}px)`;
+
+            // Update input values (-1 to 1 range)
+            touchControls.joystick.input.x = clampedX / maxDistance;
+            touchControls.joystick.input.y = clampedY / maxDistance;
+        }
+
+        function handleJoystickEnd(e) {
+            if (!touchControls.joystick.active) return;
+
+            e.preventDefault();
+            const handle = touchControls.joystick.handle;
+
+            if (handle) {
+                handle.style.transform = 'translate(0px, 0px)';
+            }
+
+            touchControls.joystick.active = false;
+            touchControls.joystick.input.x = 0;
+            touchControls.joystick.input.y = 0;
+        }
+
+        // Create touch feedback animation
+        function createTouchFeedback(x, y) {
+            const feedback = document.createElement('div');
+            feedback.className = 'touch-feedback';
+            feedback.style.left = x + 'px';
+            feedback.style.top = y + 'px';
+
+            document.body.appendChild(feedback);
+
+            setTimeout(() => {
+                feedback.remove();
+            }, 300);
+        }
+
+        // Send touch input to server
+        function sendTouchInput() {
+            if (!isMobile) return;
+
+            // Send joystick input
+            hytopia.sendData({
+                type: 'touch-input',
+                joystick: touchControls.joystick.input,
+                buttons: touchControls.buttons
+            });
+        }
+
+        function initializeUI() {
+            // Set up crosshair interaction
+            const crosshair = document.getElementById('crosshair');
+            document.addEventListener('mousedown', () => {
+                crosshair.classList.add('active');
+            });
+            document.addEventListener('mouseup', () => {
+                crosshair.classList.remove('active');
+            });
+
+            // Set up game mode selector
+            setupGameModeSelector();
+
+            // Start achievement display system
+            startAchievementSystem();
+
+            // Mobile detection and controls
+            if (detectMobile()) {
+                const mobileControls = document.getElementById('mobile-controls');
+                if (mobileControls) {
+                    mobileControls.classList.add('show');
+                }
+                initializeTouchControls();
+
+                // Set up touch input loop
+                setInterval(sendTouchInput, 50); // 20 FPS touch input
+                console.log('📱 Mobile mode activated with touch controls');
+            } else {
+                console.log('💻 Desktop mode detected');
+            }
+        }
 
         // Handle data from game server
         hytopia.onData(data => {
-            if (data.type === 'game-update') {
+            switch (data.type) {
+                case 'game-update':
                 updateGameState(data);
-            } else if (data.type === 'announcement') {
+                    break;
+                case 'announcement':
                 showAnnouncement(data.message, data.color);
+                    break;
+                case 'achievement':
+                    showAchievement(data.achievement);
+                    break;
+                case 'power-up':
+                    updatePowerUps(data.powerUps);
+                    break;
+                case 'player-update':
+                    updatePlayerStats(data.stats);
+                    break;
+                case 'minimap-update':
+                    updateMiniMap(data.players);
+                    break;
             }
         });
 
         function updateGameState(data) {
             gameState = { ...gameState, ...data };
             
-            // Update team display
-            const teamName = document.getElementById('team-name');
-            const teamInfo = document.getElementById('team-info');
-            if (gameState.team) {
-                teamName.textContent = gameState.team.toUpperCase();
-                teamInfo.className = `team-info team-${gameState.team}`;
+            // Update game mode display
+            updateGameMode();
+
+            // Update timer
+            updateTimer();
+
+            // Update team scores
+            updateTeamScores();
+
+            // Update player info
+            updatePlayerInfo();
+
+            // Update mini-map
+            if (data.players) {
+                updateMiniMap(data.players);
             }
 
-            // Update game state
-            const gameStateEl = document.getElementById('game-state');
-            switch (gameState.gameState) {
+            // Handle game state changes
+            handleGameStateChange(data.gameState);
+        }
+
+        function updateGameMode() {
+            const modeElement = document.getElementById('game-mode');
+            const modeNames = {
+                'classic': '🏐 Classic Dodgeball',
+                'survival': '⚔️ Survival Mode',
+                'time_attack': '⏱️ Time Attack',
+                'power_up_madness': '🎉 Power-up Madness',
+                'chaos': '🎲 Chaos Mode'
+            };
+            modeElement.textContent = modeNames[gameState.gameMode] || '🏐 Classic Dodgeball';
+        }
+
+        function updateTimer() {
+            const timerElement = document.getElementById('game-timer');
+            const minutes = Math.floor(gameState.timeRemaining / 60);
+            const seconds = gameState.timeRemaining % 60;
+            timerElement.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        function updateTeamScores() {
+            document.getElementById('red-score').textContent = gameState.redScore || 0;
+            document.getElementById('blue-score').textContent = gameState.blueScore || 0;
+            document.getElementById('red-players').textContent = `${gameState.redAlive || 0}/${gameState.redTotal || 0}`;
+            document.getElementById('blue-players').textContent = `${gameState.blueAlive || 0}/${gameState.blueTotal || 0}`;
+        }
+
+        function updatePlayerInfo() {
+            if (gameState.currentPlayer) {
+                document.getElementById('player-name').textContent = gameState.currentPlayer.username;
+                document.getElementById('player-avatar').textContent = gameState.currentPlayer.username.charAt(0).toUpperCase();
+                document.getElementById('player-team').textContent = `Team: ${gameState.team?.toUpperCase() || 'Unknown'}`;
+            }
+        }
+
+        function updatePlayerStats(stats) {
+            gameState.playerStats = { ...gameState.playerStats, ...stats };
+
+            document.getElementById('balls-thrown').textContent = gameState.playerStats.ballsThrown;
+            document.getElementById('catches').textContent = gameState.playerStats.catches;
+            document.getElementById('deaths').textContent = gameState.playerStats.deaths;
+            document.getElementById('power-ups').textContent = gameState.playerStats.powerUpsCollected;
+            document.getElementById('kd-ratio').textContent = gameState.playerStats.kdRatio.toFixed(2);
+            document.getElementById('best-streak').textContent = gameState.playerStats.bestStreak;
+        }
+
+        function updatePowerUps(powerUps) {
+            gameState.powerUps = powerUps || [];
+
+            const slots = document.querySelectorAll('.power-up-slot');
+            slots.forEach((slot, index) => {
+                const powerUp = gameState.powerUps[index];
+                const cooldownBar = slot.querySelector('.power-up-cooldown');
+
+                if (powerUp) {
+                    slot.textContent = powerUp.icon || '⚡';
+                    slot.classList.add('active');
+
+                    // Update cooldown bar
+                    const progress = powerUp.cooldownRemaining / powerUp.cooldownTotal;
+                    cooldownBar.style.transform = `scaleX(${1 - progress})`;
+                } else {
+                    slot.textContent = '';
+                    slot.classList.remove('active');
+                    cooldownBar.style.transform = 'scaleX(0)';
+                }
+            });
+        }
+
+        function updateMiniMap(players) {
+            const miniMap = document.getElementById('mini-map');
+
+            // Clear existing player dots
+            const existingDots = miniMap.querySelectorAll('.map-player');
+            existingDots.forEach(dot => dot.remove());
+
+            // Add new player dots
+            players.forEach(player => {
+                const dot = document.createElement('div');
+                dot.className = `map-player team-${player.team}`;
+                if (player.isCurrentPlayer) {
+                    dot.classList.add('current');
+                }
+
+                // Convert world coordinates to mini-map coordinates
+                const mapX = ((player.x + 35) / 70) * 150; // Assuming arena is -35 to +35
+                const mapZ = ((player.z + 40) / 80) * 150; // Assuming arena is -40 to +40
+
+                dot.style.left = `${Math.max(0, Math.min(142, mapX))}px`;
+                dot.style.top = `${Math.max(0, Math.min(142, mapZ))}px`;
+
+                miniMap.appendChild(dot);
+            });
+        }
+
+        function handleGameStateChange(newState) {
+            const eliminatedOverlay = document.getElementById('eliminated-overlay');
+            const eliminatedMessage = document.getElementById('eliminated-message');
+
+            switch (newState) {
                 case 'waiting':
-                    gameStateEl.textContent = 'Waiting for players...';
-                    break;
-                case 'starting':
-                    gameStateEl.textContent = 'Game starting...';
+                    eliminatedOverlay.classList.remove('show');
                     break;
                 case 'playing':
-                    gameStateEl.textContent = 'ROUND IN PROGRESS';
+                    eliminatedOverlay.classList.remove('show');
                     break;
-                case 'ending':
-                    gameStateEl.textContent = 'Round ending...';
+                case 'eliminated':
+                    eliminatedOverlay.classList.add('show');
+                    eliminatedMessage.textContent = 'YOU ARE ELIMINATED!';
                     break;
-            }
-
-            // Update team counts
-            document.getElementById('red-alive').textContent = gameState.redAlive;
-            document.getElementById('blue-alive').textContent = gameState.blueAlive;
-
-            // Show/hide eliminated overlay
-            const eliminatedOverlay = document.getElementById('eliminated-overlay');
-            if (!gameState.isAlive) {
-                eliminatedOverlay.classList.add('show');
-            } else {
-                eliminatedOverlay.classList.remove('show');
+                case 'spectating':
+                    eliminatedOverlay.classList.add('show');
+                    eliminatedMessage.textContent = 'SPECTATING...';
+                    break;
             }
         }
 
@@ -257,11 +1126,202 @@
 
             setTimeout(() => {
                 announcement.classList.remove('show');
+            }, 4000);
+        }
+
+        function showAchievement(achievement) {
+            achievementQueue.push(achievement);
+
+            if (achievementQueue.length === 1) {
+                displayNextAchievement();
+            }
+        }
+
+        function displayNextAchievement() {
+            if (achievementQueue.length === 0) return;
+
+            const achievement = achievementQueue[0];
+            const notification = document.getElementById('achievement-notification');
+            const icon = document.getElementById('achievement-icon');
+            const title = document.getElementById('achievement-title');
+            const description = document.getElementById('achievement-description');
+
+            icon.textContent = achievement.icon || '🏆';
+            title.textContent = achievement.name || 'Achievement Unlocked!';
+            description.textContent = achievement.description || '';
+
+            notification.style.display = 'flex';
+            notification.style.animation = 'slideIn 0.5s ease-out';
+
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.5s ease-in';
+                setTimeout(() => {
+                    notification.style.display = 'none';
+                    achievementQueue.shift();
+                    displayNextAchievement();
+                }, 500);
             }, 3000);
         }
 
-        // Debug info
-        console.log('Dodgeball UI loaded');
+        function setupGameModeSelector() {
+            const selector = document.getElementById('game-mode-selector');
+            const options = selector.querySelectorAll('.mode-option');
+
+            options.forEach(option => {
+                option.addEventListener('click', () => {
+                    const mode = option.dataset.mode;
+                    selectGameMode(mode);
+                });
+            });
+        }
+
+        function selectGameMode(mode) {
+            // Send mode selection to server
+            hytopia.sendData({
+                type: 'mode-select',
+                mode: mode
+            });
+
+            // Hide selector
+            document.getElementById('game-mode-selector').style.display = 'none';
+        }
+
+        function startAchievementSystem() {
+            // Add CSS animations for achievements
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes slideIn {
+                    from { transform: translateX(-100%); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                }
+                @keyframes slideOut {
+                    from { transform: translateX(0); opacity: 1; }
+                    to { transform: translateX(100%); opacity: 0; }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
+        // Achievement notification styles
+        const achievementStyles = `
+            .achievement-notification {
+                position: fixed;
+                top: 50%;
+                right: 20px;
+                transform: translateY(-50%);
+                background: linear-gradient(135deg, var(--accent-gold), var(--primary-red));
+                border-radius: 12px;
+                padding: 20px;
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+                z-index: 2000;
+                min-width: 300px;
+                border: 3px solid var(--neutral-light);
+            }
+
+            .achievement-content {
+                display: flex;
+                align-items: center;
+                gap: 15px;
+            }
+
+            .achievement-icon {
+                font-size: 48px;
+                animation: bounce 0.6s ease-in-out;
+            }
+
+            .achievement-text h3 {
+                margin: 0 0 5px 0;
+                color: var(--neutral-dark);
+                font-size: 18px;
+            }
+
+            .achievement-description {
+                color: var(--neutral-dark);
+                opacity: 0.9;
+                font-size: 14px;
+            }
+
+            @keyframes bounce {
+                0%, 20%, 53%, 80%, 100% { transform: translateY(0); }
+                40%, 43% { transform: translateY(-10px); }
+                70% { transform: translateY(-5px); }
+                90% { transform: translateY(-2px); }
+            }
+
+            .game-mode-selector {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.9);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 3000;
+            }
+
+            .mode-selector-content {
+                background: var(--neutral-light);
+                padding: 30px;
+                border-radius: 16px;
+                text-align: center;
+                max-width: 600px;
+                width: 90%;
+            }
+
+            .mode-selector-content h2 {
+                margin-bottom: 30px;
+                color: var(--neutral-dark);
+                font-size: 28px;
+            }
+
+            .mode-options {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 20px;
+            }
+
+            .mode-option {
+                background: var(--neutral-light);
+                border: 3px solid #e0e0e0;
+                border-radius: 12px;
+                padding: 20px;
+                cursor: pointer;
+                transition: all 0.3s ease;
+                text-align: center;
+            }
+
+            .mode-option:hover {
+                border-color: var(--accent-gold);
+                transform: translateY(-5px);
+                box-shadow: 0 8px 25px rgba(255, 215, 0, 0.3);
+            }
+
+            .mode-icon {
+                font-size: 48px;
+                margin-bottom: 10px;
+            }
+
+            .mode-info h3 {
+                margin: 0 0 8px 0;
+                color: var(--neutral-dark);
+                font-size: 16px;
+            }
+
+            .mode-info p {
+                margin: 0;
+                color: #666;
+                font-size: 14px;
+            }
+        `;
+
+        // Add achievement styles to document
+        const achievementStyleElement = document.createElement('style');
+        achievementStyleElement.textContent = achievementStyles;
+        document.head.appendChild(achievementStyleElement);
+
+        console.log('🎮 Ultimate Dodgeball Arena UI initialized');
     </script>
 </body>
 </html>

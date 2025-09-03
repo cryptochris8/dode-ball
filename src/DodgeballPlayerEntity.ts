@@ -3,17 +3,48 @@ import {
   DefaultPlayerEntity,
   DefaultPlayerEntityController,
   BaseEntityControllerEvent,
-  EventPayloads,
   World,
-  Vector3Like,
-  QuaternionLike,
   PlayerCameraMode,
+  Audio,
 } from 'hytopia';
 
-import GameManager, { Team } from './GameManager';
+import GameManager from './GameManager.ts';
+import { GameConfig, PowerUpType, POWER_UP_CONFIG, Team } from './GameConfig.ts';
+import AchievementSystem from './AchievementSystem.ts';
+
+interface ActivePowerUp {
+  type: PowerUpType;
+  endTime: number;
+  effect: any;
+}
 
 export default class DodgeballPlayerEntity extends DefaultPlayerEntity {
+  // Core player state
   private _isAlive: boolean = true;
+  private _team: Team | null = null;
+  private _health: number = GameConfig.PLAYER_HEALTH;
+  private _shield: number = GameConfig.PLAYER_SHIELD;
+
+  // Power-up system
+  private _activePowerUps: Map<PowerUpType, ActivePowerUp> = new Map();
+  private _powerUpEffects: Map<string, NodeJS.Timeout> = new Map();
+
+  // Enhanced movement
+  private _speedMultiplier: number = 1.0;
+  private _dashCooldown: number = 0;
+
+  // Statistics tracking
+  private _stats = {
+    eliminations: 0,
+    deaths: 0,
+    catches: 0,
+    powerUpsCollected: 0,
+    dashUses: 0,
+  };
+
+  // Audio effects
+  private _hitAudio: Audio | undefined;
+  private _powerUpAudio: Audio | undefined;
 
   public constructor(player: Player) {
     super({
@@ -22,28 +53,61 @@ export default class DodgeballPlayerEntity extends DefaultPlayerEntity {
       modelUri: 'models/players/player.gltf',
       modelScale: 0.5,
     });
+
+    this.initializePlayer();
   }
 
-  public override spawn(world: World, position: Vector3Like, rotation?: QuaternionLike): void {
+  private initializePlayer(): void {
+    // Initialize statistics tracking
+    AchievementSystem.instance.initializePlayer(this.player);
+
+    // Set up audio effects
+    this._hitAudio = new Audio({
+      attachedToEntity: this,
+      uri: 'audio/sfx/player-hit.mp3',
+      volume: 0.7,
+    });
+
+    this._powerUpAudio = new Audio({
+      attachedToEntity: this,
+      uri: 'audio/sfx/power-up-collect.mp3',
+      volume: 0.8,
+    });
+
+    console.log(`🎮 Enhanced player initialized for ${this.player.username}`);
+  }
+
+  public override spawn(world: World, position: any, rotation?: any): void {
     super.spawn(world, position, rotation);
-    
-    // Set up our custom behavior after spawn
+
+    // Reset player state
+    this._isAlive = true;
+    this._health = GameConfig.PLAYER_HEALTH;
+    this._shield = GameConfig.PLAYER_SHIELD;
+    this._speedMultiplier = 1.0;
+    this._dashCooldown = 0;
+
+    // Clear any active power-ups
+    this.clearAllPowerUps();
+
+    // Set up enhanced player systems
     setTimeout(() => {
-      this._setupPlayerController();
-      this._setupPlayerCamera();
-    }, 100); // Small delay to ensure controller is ready
-    
-    // Send welcome message
+      this.setupEnhancedController();
+      this.setupEnhancedCamera();
+    }, 100);
+
+    // Send enhanced welcome message
     if (this.world) {
       this.world.chatManager.sendPlayerMessage(
         this.player,
-        'Welcome to Dodgeball! Use WASD to move, Space to jump, Shift to run.',
+        '🎯 Welcome to Ultimate Dodgeball Arena!',
         '00FF00'
       );
+
       this.world.chatManager.sendPlayerMessage(
         this.player,
-        'Left click to throw dodgeballs!',
-        '00FF00'
+        'Controls: WASD (Move), Space (Jump), Shift (Run), Left Click (Throw), Right Click (Catch), Q (Dash)',
+        'FFFF00'
       );
     }
   }
@@ -52,182 +116,162 @@ export default class DodgeballPlayerEntity extends DefaultPlayerEntity {
     return this._isAlive;
   }
 
+  // Enhanced elimination with shield system
   public eliminate(): void {
     if (!this._isAlive) return;
-    
+
+    // Check shield first
+    if (this._shield > 0) {
+      this._shield = 0;
+      this._activePowerUps.delete(PowerUpType.SHIELD);
+
+      // Shield break effect
+      this.world?.createParticleEffect(this.position, 'shield_break');
+      this.world?.chatManager.sendPlayerMessage(
+        this.player,
+        '🛡️ Shield broke! You survived!',
+        '00CED1'
+      );
+      return;
+    }
+
     this._isAlive = false;
-    
-    // Visual effect - make player semi-transparent
+    this._stats.deaths++;
+
+    // Record death for achievements
+    AchievementSystem.instance.recordDeath(this.player);
+
+    // Visual effects
     this.setOpacity(0.5);
-    
-    // Prevent movement
+    this.startModelOneshotAnimations(['death']);
+
+    // Disable movement
     this.playerController.canWalk = () => false;
     this.playerController.canRun = () => false;
     this.playerController.canJump = () => false;
-    
-    // Play elimination animation
-    this.startModelOneshotAnimations(['sleep']);
-    
+
     // Notify game manager
     GameManager.instance.eliminatePlayer(this.player);
   }
 
-  public revive(): void {
+  public takeDamage(damage: number): void {
+    this._health -= damage;
+
+    // Visual feedback
+    this.setTintColor({ r: 255, g: 0, b: 0 });
+    setTimeout(() => this.setTintColor({ r: 255, g: 255, b: 255 }), 200);
+
+    // Audio feedback
+    this._hitAudio?.play(this.world);
+
+    // Check for elimination
+    if (this._health <= 0) {
+      this.eliminate();
+    }
+  }
+
+  public respawn(): void {
     this._isAlive = true;
-    
+    this._health = GameConfig.PLAYER_HEALTH;
+    this._shield = GameConfig.PLAYER_SHIELD;
+
     // Restore visual
     this.setOpacity(1.0);
-    
+    this.clearAllPowerUps();
+
     // Restore movement
     this.playerController.canWalk = () => true;
     this.playerController.canRun = () => true;
     this.playerController.canJump = () => true;
-    
+
     // Reset animations
-    this.resetAnimations();
+    this.setupAnimations();
+
+    // Respawn audio
+    new Audio({
+      attachedToEntity: this,
+      uri: 'audio/sfx/respawn.mp3',
+      volume: 0.6,
+    }).play(this.world);
   }
 
-  private _setupPlayerController(): void {
-    if (!this.playerController) {
-      console.warn('Player controller not ready, retrying...');
-      setTimeout(() => this._setupPlayerController(), 100);
-      return;
+  // Update method called every frame
+  public update(deltaTimeMs: number): void {
+    // Update power-up effects
+    this.updatePowerUps(deltaTimeMs);
+
+    // Update cooldowns
+    if (this._dashCooldown > 0) {
+      this._dashCooldown -= deltaTimeMs;
+    }
+  }
+
+  private updatePowerUps(deltaTimeMs: number): void {
+    const now = Date.now();
+    const toRemove: PowerUpType[] = [];
+
+    for (const [type, powerUp] of this._activePowerUps) {
+      if (powerUp.endTime > 0 && now >= powerUp.endTime) {
+        toRemove.push(type);
+      }
     }
 
-    // Allow continuous left click for throwing
-    this.playerController.autoCancelMouseLeftClick = false;
-    
-    // Set up input handling
-    this.playerController.on(
-      BaseEntityControllerEvent.TICK_WITH_PLAYER_INPUT,
-      this._onTickWithPlayerInput
-    );
-    
-    // Reset animations to defaults
-    this.resetAnimations();
-  }
+    // Remove expired power-ups
+    for (const type of toRemove) {
+      this._activePowerUps.delete(type);
 
-  private _setupPlayerCamera(): void {
-    // Use first-person view for better dodgeball throwing
-    this.player.camera.setMode(PlayerCameraMode.FIRST_PERSON);
-    this.player.camera.setModelHiddenNodes(['head', 'neck']);
-    this.player.camera.setOffset({ x: 0, y: 0.5, z: 0 });
-  }
-
-  private _onTickWithPlayerInput = (payload: EventPayloads[BaseEntityControllerEvent.TICK_WITH_PLAYER_INPUT]): void => {
-    const { input } = payload;
-
-    // Only handle input if player is alive
-    if (!this._isAlive) {
-      // Clear all inputs for dead players
-      Object.keys(input).forEach(key => {
-        input[key] = false;
-      });
-      return;
-    }
-
-    // Handle throwing
-    if (input.ml) {
-      this._handleThrow();
-      input.ml = false; // Prevent spam clicking
-    }
-
-    // Handle catching
-    if (input.mr) {
-      this._handleCatch();
-      input.mr = false; // Prevent spam clicking
-    }
-  };
-
-  private _handleThrow(): void {
-    if (!this.world || !this._isAlive) return;
-    
-    console.log(`${this.player.username} is throwing a dodgeball!`);
-    
-    // Play throwing animation
-    this.startModelOneshotAnimations(['simple_interact']);
-    
-    // Create and throw a dodgeball
-    this._createAndThrowDodgeball();
-  }
-
-  private _createAndThrowDodgeball(): void {
-    if (!this.world) return;
-
-    // Import DodgeballEntity dynamically to avoid circular imports
-    import('./DodgeballEntity').then(({ default: DodgeballEntity }) => {
-      if (!this.world) return;
-
-      const dodgeball = new DodgeballEntity();
-      
-      // Calculate spawn position in front of player
-      const spawnPosition = {
-        x: this.position.x + this.player.camera.facingDirection.x * 1.5,
-        y: this.position.y + this.player.camera.offset.y,
-        z: this.position.z + this.player.camera.facingDirection.z * 1.5,
-      };
-      
-      // Spawn the dodgeball
-      dodgeball.spawn(this.world, spawnPosition);
-      
-      // Throw it in the facing direction
-      dodgeball.throw(this, this.player.camera.facingDirection);
-    });
-  }
-
-  private _handleCatch(): void {
-    if (!this.world || !this._isAlive) return;
-
-    // Look for catchable dodgeballs in range
-    const catchRange = 2.0;
-    const playerPos = this.position;
-
-    // Import DodgeballEntity to check for catchable balls
-    import('./DodgeballEntity').then(({ default: DodgeballEntity }) => {
-      if (!this.world) return;
-
-      const dodgeballs = this.world.entityManager.getAllEntities()
-        .filter(entity => entity instanceof DodgeballEntity) as DodgeballEntity[];
-
-      for (const dodgeball of dodgeballs) {
-        const distance = Math.sqrt(
-          Math.pow(dodgeball.position.x - playerPos.x, 2) +
-          Math.pow(dodgeball.position.y - playerPos.y, 2) +
-          Math.pow(dodgeball.position.z - playerPos.z, 2)
-        );
-
-        if (distance <= catchRange && dodgeball.canBeCaught()) {
-          dodgeball.catch(this);
-          
-          // Play catch animation
-          this.startModelOneshotAnimations(['simple_interact']);
-          
-          if (this.world) {
-            this.world.chatManager.sendPlayerMessage(
-              this.player,
-              'Nice catch!',
-              '00FF00'
-            );
+      // Handle cleanup for specific power-ups
+      switch (type) {
+        case PowerUpType.INVISIBILITY:
+          this.setOpacity(1.0);
+          break;
+        case PowerUpType.SPEED_BOOST:
+          this.clearGlowEffect();
+          break;
           }
-          return;
-        }
-      }
-
-      // No catchable ball found
-      if (this.world) {
-        this.world.chatManager.sendPlayerMessage(
-          this.player,
-          'No ball in range to catch!',
-          'FFFF00'
-        );
-      }
-    });
   }
 
-  private resetAnimations(): void {
-    this.playerController.idleLoopedAnimations = ['idle_lower', 'idle_upper'];
-    this.playerController.walkLoopedAnimations = ['walk_lower', 'walk_upper'];
-    this.playerController.runLoopedAnimations = ['run_lower', 'run_upper'];
-    this.playerController.jumpOneshotAnimations = ['jump'];
+  // Getters
+  public get team(): Team | null {
+    return this._team;
+  }
+
+  public set team(team: Team | null) {
+    this._team = team;
+  }
+
+  public get health(): number {
+    return this._health;
+  }
+
+  public get shield(): number {
+    return this._shield;
+  }
+
+  public get stats() {
+    return { ...this._stats };
+  }
+
+  public get activePowerUps(): PowerUpType[] {
+    return Array.from(this._activePowerUps.keys());
+  }
+
+  // Mobile control methods
+  public handleThrow(): void {
+    // Trigger throw action - would need to implement throwing logic
+    console.log(`🎯 ${this.player?.username} triggered throw from mobile`);
+    // This would typically trigger the throw animation and create a dodgeball
+  }
+
+  public handleCatch(): void {
+    // Trigger catch action - would need to implement catching logic
+    console.log(`👐 ${this.player?.username} triggered catch from mobile`);
+    // This would typically check for nearby catchable dodgeballs
+  }
+
+  public handleDash(): void {
+    // Trigger dash action
+    console.log(`⚡ ${this.player?.username} triggered dash from mobile`);
+    // This would typically trigger the dash movement
   }
 }

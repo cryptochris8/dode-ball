@@ -186,19 +186,30 @@ We welcome contributions! Please feel free to submit issues, feature requests, o
 - **Efficient memory usage** with automatic cleanup
 - **Real-time synchronization** for all game state
 
-## 🐛 Known Issues & Roadmap
+## 🐛 Current Status & Roadmap
+
+### ✅ **COMPLETED FEATURES**
+- [x] Tournament mode with brackets and player management
+- [x] Advanced statistics dashboard with analytics
+- [x] Spectator mode with multiple camera options
+- [x] AI opponents with customizable difficulty
+- [x] Seasonal events with unique mechanics
+- [x] Voice chat integration (team-based spatial audio)
+- [x] Mobile client support with touch controls
+- [x] Migration from Bun to NPM/Node.js
+- [x] Comprehensive chat command system
+- [x] Achievement system with persistent tracking
+- [x] Power-up system (8 different abilities)
+- [x] 5 Game modes (Classic, Survival, Time Attack, Power-up Madness, Chaos)
+
+### 🔄 **REMAINING FEATURES**
+- [ ] Custom arena creation tools
+- [ ] Match recording and replay system
 
 ### Current Limitations
 - Some visual effects require additional asset creation
 - Achievement persistence requires database integration
-- Advanced AI opponents not yet implemented
-
-### Planned Features
-- [ ] Tournament mode with brackets
-- [ ] Custom arena creation tools
-- [ ] Advanced statistics dashboard
-- [ ] Voice chat integration
-- [ ] Mobile client support
+- Advanced AI behavior patterns could be expanded
 
 ## 📄 License
 
